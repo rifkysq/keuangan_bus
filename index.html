@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Manajemen Kwitansi</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Family Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons CDN -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Print Layout Styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printArea, #printArea * {
+                visibility: visible;
+            }
+            #printArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+                background: #ffffff !important;
+                color: #000000 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Top Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Brand Title -->
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-brand-50 text-brand-600 rounded-xl">
+                        <i class="ph ph-receipt text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-slate-900 text-lg leading-tight">E-Kwitansi</h1>
+                        <p class="text-xs text-slate-500 hidden sm:block">Sistem Pencatatan Kwitansi Google Sheets</p>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center gap-2">
+                    <button onclick="openConfigModal()" class="flex items-center gap-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-brand-600 px-3 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition">
+                        <i class="ph ph-gear text-lg"></i>
+                        <span class="hidden sm:inline">Set Setting API</span>
+                    </button>
+                    <button onclick="openModal('CREATE')" class="flex items-center gap-2 text-xs sm:text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg shadow-sm shadow-brand-500/20 transition">
+                        <i class="ph ph-plus-circle text-lg"></i>
+                        <span>Tambah Kwitansi</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 no-print">
+        
+        <!-- API URL Warning Banner if Not Set -->
+        <div id="apiWarning" class="hidden mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 text-amber-800">
+            <i class="ph ph-warning-circle text-xl text-amber-600 shrink-0 mt-0.5"></i>
+            <div class="flex-1 text-sm">
+                <p class="font-semibold">URL Google Apps Script belum dikonfigurasi!</p>
+                <p class="text-amber-700 mt-0.5">Klik tombol di sebelah kanan untuk memasukkan URL Web App Google Apps Script Anda agar data dapat disinkronkan.</p>
+            </div>
+            <button onclick="openConfigModal()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-medium shrink-0 transition">
+                Atur URL
+            </button>
+        </div>
+
+        <!-- Summary Statistics Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Kwitansi</p>
+                    <h3 id="statTotalCount" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                    <i class="ph ph-files text-2xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Nominal</p>
+                    <h3 id="statTotalNominal" class="text-xl font-bold text-slate-900 mt-1">Rp 0</h3>
+                </div>
+                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <i class="ph ph-wallet text-2xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Tipe Lebur</p>
+                    <h3 id="statLeburCount" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-purple-50 text-purple-600 rounded-xl">
+                    <i class="ph ph-fire text-2xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Tipe Tak Lebur</p>
+                    <h3 id="statTakLeburCount" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+                </div>
+                <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                    <i class="ph ph-shield-check text-2xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls & Data Table Container -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <!-- Search & Filter Bar -->
+            <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/50">
+                <div class="relative w-full sm:w-80">
+                    <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                    <input type="text" id="searchInput" oninput="filterData()" placeholder="Cari nomor atau keterangan..." class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition">
+                </div>
+
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                    <div class="flex items-center gap-2">
+                        <label class="text-xs font-medium text-slate-500 hidden sm:inline">Filter:</label>
+                        <select id="filterKategori" onchange="filterData()" class="bg-white border border-slate-200 text-sm rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="">Semua Kategori</option>
+                            <option value="Lebur">Lebur</option>
+                            <option value="Tak Lebur">Tak Lebur</option>
+                        </select>
+                    </div>
+
+                    <button onclick="fetchData()" title="Refresh Data" class="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition">
+                        <i id="refreshIcon" class="ph ph-arrows-clockwise text-lg block"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table Section -->
+            <div class="overflow-x-auto min-h-[300px]">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            <th class="py-3.5 px-4 sm:px-6">No. Kwitansi</th>
+                            <th class="py-3.5 px-4 sm:px-6">Kategori</th>
+                            <th class="py-3.5 px-4 sm:px-6">Nominal</th>
+                            <th class="py-3.5 px-4 sm:px-6">Tanggal</th>
+                            <th class="py-3.5 px-4 sm:px-6">Keterangan</th>
+                            <th class="py-3.5 px-4 sm:px-6 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100 text-sm text-slate-700">
+                        <!-- Rows rendered dynamically via JS -->
+                    </tbody>
+                </table>
+
+                <!-- Loading State Spinner -->
+                <div id="loadingState" class="py-16 flex flex-col items-center justify-center text-slate-400">
+                    <i class="ph ph-spinner text-4xl animate-spin text-brand-600 mb-2"></i>
+                    <p class="text-sm font-medium text-slate-500">Memuat data dari Google Sheets...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden py-16 flex flex-col items-center justify-center text-slate-400">
+                    <i class="ph ph-receipt text-5xl mb-2 text-slate-300"></i>
+                    <p class="text-base font-semibold text-slate-600">Tidak ada data kwitansi</p>
+                    <p class="text-xs text-slate-400 mt-1">Data belum ditambahkan atau tidak sesuai filter search.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400 no-print mt-auto">
+        <p>&copy; 2026 E-Kwitansi System &bull; Integrated with Google Sheets & Vercel</p>
+    </footer>
+
+    <!-- Modal Form (Create / Edit) -->
+    <div id="formModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-200" id="formModalBox">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 id="modalTitle" class="font-bold text-slate-900 text-base">Tambah Kwitansi Baru</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="kwitansiForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="formId">
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nomor Kwitansi *</label>
+                    <input type="text" id="formNomor" required placeholder="Contoh: KW-2026-001" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Kategori *</label>
+                        <select id="formKategori" required class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            <option value="Lebur">Lebur</option>
+                            <option value="Tak Lebur">Tak Lebur</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tanggal *</label>
+                        <input type="date" id="formTanggal" required class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Nominal (Rp) *</label>
+                    <input type="text" id="formNominal" required placeholder="0" oninput="formatCurrencyInput(this)" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Keterangan</label>
+                    <textarea id="formKeterangan" rows="3" placeholder="Rincian atau keterangan tambahan..." class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none resize-none"></textarea>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition">
+                        Batal
+                    </button>
+                    <button type="submit" id="btnSave" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium shadow-sm transition flex items-center gap-2">
+                        <span>Simpan Data</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- API Config Modal -->
+    <div id="configModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 class="font-bold text-slate-900 text-base">Konfigurasi Google Apps Script</h3>
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Masukkan **Web App URL** dari hasil Deploy Google Apps Script Anda (pilihan Access: *Anyone*).
+                </p>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Web App API URL</label>
+                    <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button onclick="closeConfigModal()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition">Batal</button>
+                    <button onclick="saveApiUrl()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium transition">Simpan Setting</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Delete Confirmation -->
+    <div id="deleteModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
+            <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="ph ph-trash text-2xl"></i>
+            </div>
+            <h3 class="font-bold text-slate-900 text-base">Hapus Kwitansi ini?</h3>
+            <p class="text-xs text-slate-500 mt-1">Data yang dihapus tidak dapat dikembalikan dari Google Sheets.</p>
+            <div class="mt-6 flex justify-center gap-3">
+                <button onclick="closeDeleteModal()" class="w-full py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition">Batal</button>
+                <button id="btnConfirmDelete" onclick="executeDelete()" class="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-medium transition">Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Printable Invoice Modal / View -->
+    <div id="printModal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-4 mb-6 no-print">
+                <h3 class="font-bold text-slate-800 text-lg">Preview / Cetak Kwitansi</h3>
+                <div class="flex gap-2">
+                    <button onclick="window.print()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition">
+                        <i class="ph ph-printer text-lg"></i>
+                        <span>Cetak / PDF</span>
+                    </button>
+                    <button onclick="closePrintModal()" class="px-3 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+
+            <!-- Print Printable Content -->
+            <div id="printArea" class="border border-slate-200 rounded-2xl p-6 sm:p-8 bg-white">
+                <div class="flex justify-between items-start border-b border-slate-200 pb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold tracking-wider text-slate-900">KWITANSI PEMBAYARAN</h2>
+                        <p class="text-xs text-slate-500 mt-1">Sistem Pencatatan Resmi</p>
+                    </div>
+                    <div class="text-right">
+                        <span id="printBadge" class="px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider"></span>
+                        <p class="text-xs text-slate-400 mt-2">No: <span id="printNomor" class="font-mono text-slate-800 font-bold"></span></p>
+                    </div>
+                </div>
+
+                <div class="py-6 space-y-4">
+                    <div class="flex justify-between border-b border-slate-100 pb-2 text-sm">
+                        <span class="text-slate-500">Tanggal Transaksi</span>
+                        <span id="printTanggal" class="font-medium text-slate-900"></span>
+                    </div>
+
+                    <div class="flex justify-between border-b border-slate-100 pb-2 text-sm">
+                        <span class="text-slate-500">Kategori Kwitansi</span>
+                        <span id="printKategori" class="font-medium text-slate-900"></span>
+                    </div>
+
+                    <div class="flex justify-between border-b border-slate-100 pb-2 text-sm">
+                        <span class="text-slate-500">Keterangan / Peruntukan</span>
+                        <span id="printKeterangan" class="font-medium text-slate-900 text-right max-w-xs"></span>
+                    </div>
+
+                    <div class="mt-6 p-4 bg-slate-50 rounded-xl flex justify-between items-center border border-slate-200">
+                        <span class="text-sm font-semibold text-slate-600 uppercase">Jumlah Total:</span>
+                        <span id="printNominal" class="text-2xl font-bold text-brand-600"></span>
+                    </div>
+                </div>
+
+                <div class="pt-8 grid grid-cols-2 text-center text-xs text-slate-500">
+                    <div>
+                        <p>Diterima Oleh,</p>
+                        <div class="h-16"></div>
+                        <p class="font-semibold text-slate-800">( ..................................... )</p>
+                    </div>
+                    <div>
+                        <p>Penyetor / Kasir,</p>
+                        <div class="h-16"></div>
+                        <p class="font-semibold text-slate-800">( ..................................... )</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none no-print"></div>
+
+    <script>
+        // Global State Variable
+        let rawData = [];
+        let deleteTargetId = null;
+        let apiUrl = localStorage.getItem('KWITANSI_API_URL') || 'https://script.google.com/macros/s/AKfycbw1xWTFdZK_bHr8-900ddnnYoEDhPLcDxzy5_9h32pxTUIRYNEp4R0--j-8z6KqltHQ/exec';
+
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', () => {
+            // Pre-fill today's date in form
+            document.getElementById('formTanggal').value = new Date().toISOString().split('T')[0];
+            
+            if (!apiUrl) {
+                document.getElementById('apiWarning').classList.remove('hidden');
+            } else {
+                fetchData();
+            }
+        });
+
+        // Config API Modal Handlers
+        function openConfigModal() {
+            document.getElementById('apiUrlInput').value = apiUrl;
+            document.getElementById('configModal').classList.remove('hidden');
+        }
+
+        function closeConfigModal() {
+            document.getElementById('configModal').classList.add('hidden');
+        }
+
+        function saveApiUrl() {
+            const input = document.getElementById('apiUrlInput').value.trim();
+            if (!input) {
+                showToast('API URL tidak boleh kosong!', 'error');
+                return;
+            }
+            apiUrl = input;
+            localStorage.setItem('KWITANSI_API_URL', apiUrl);
+            document.getElementById('apiWarning').classList.add('hidden');
+            closeConfigModal();
+            showToast('URL API berhasil disimpan!', 'success');
+            fetchData();
+        }
+
+        // Currency Formatter Helper
+        function formatRupiah(number) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number);
+        }
+
+        function formatCurrencyInput(input) {
+            let value = input.value.replace(/\D/g, '');
+            input.value = value ? new Intl.NumberFormat('id-ID').format(value) : '';
+        }
+
+        function unformatCurrency(formattedStr) {
+            if (typeof formattedStr === 'number') return formattedStr;
+            return parseInt(String(formattedStr).replace(/\D/g, ''), 10) || 0;
+        }
+
+        // Fetch Data from Google Apps Script
+        async function fetchData() {
+            if (!apiUrl) return;
+
+            const refreshIcon = document.getElementById('refreshIcon');
+            const loadingState = document.getElementById('loadingState');
+            const emptyState = document.getElementById('emptyState');
+            const tableBody = document.getElementById('tableBody');
+
+            refreshIcon.classList.add('animate-spin');
+            loadingState.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+            tableBody.innerHTML = '';
+
+            try {
+                const response = await fetch(apiUrl);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    rawData = result.data || [];
+                    renderTable(rawData);
+                    updateStatistics(rawData);
+                } else {
+                    showToast(result.message || 'Gagal mengambil data', 'error');
+                }
+            } catch (err) {
+                console.error('Fetch Error:', err);
+                showToast('Gagal terhubung ke Google Sheets API.', 'error');
+            } finally {
+                refreshIcon.classList.remove('animate-spin');
+                loadingState.classList.add('hidden');
+            }
+        }
+
+        // Render Table Rows
+        function renderTable(data) {
+            const tableBody = document.getElementById('tableBody');
+            const emptyState = document.getElementById('emptyState');
+
+            tableBody.innerHTML = '';
+
+            if (data.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            data.forEach((item) => {
+                const isLebur = (item.kategori || '').toLowerCase() === 'lebur';
+                const badgeClass = isLebur 
+                    ? 'bg-purple-100 text-purple-700 border-purple-200' 
+                    : 'bg-amber-100 text-amber-700 border-amber-200';
+
+                const formattedDate = item.tanggal ? new Date(item.tanggal).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition duration-150";
+                tr.innerHTML = `
+                    <td class="py-3.5 px-4 sm:px-6 font-mono font-medium text-slate-800">${item.nomor || '-'}</td>
+                    <td class="py-3.5 px-4 sm:px-6">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${badgeClass}">
+                            ${item.kategori || '-'}
+                        </span>
+                    </td>
+                    <td class="py-3.5 px-4 sm:px-6 font-semibold text-slate-900">${formatRupiah(unformatCurrency(item.nominal))}</td>
+                    <td class="py-3.5 px-4 sm:px-6 text-slate-500">${formattedDate}</td>
+                    <td class="py-3.5 px-4 sm:px-6 text-slate-600 max-w-xs truncate" title="${item.keterangan || ''}">${item.keterangan || '-'}</td>
+                    <td class="py-3.5 px-4 sm:px-6 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick='openPrintModal(${JSON.stringify(item)})' class="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition" title="Cetak Kwitansi">
+                                <i class="ph ph-printer text-lg"></i>
+                            </button>
+                            <button onclick='openModal("UPDATE", ${JSON.stringify(item)})' class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit Data">
+                                <i class="ph ph-note-pencil text-lg"></i>
+                            </button>
+                            <button onclick='confirmDelete("${item.id}")' class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Hapus Data">
+                                <i class="ph ph-trash text-lg"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // Update Summary Dashboard Statistics
+        function updateStatistics(data) {
+            let totalNominal = 0;
+            let leburCount = 0;
+            let takLeburCount = 0;
+
+            data.forEach(item => {
+                const nominal = unformatCurrency(item.nominal);
+                totalNominal += nominal;
+
+                if ((item.kategori || '').toLowerCase() === 'lebur') {
+                    leburCount++;
+                } else {
+                    takLeburCount++;
+                }
+            });
+
+            document.getElementById('statTotalCount').innerText = data.length;
+            document.getElementById('statTotalNominal').innerText = formatRupiah(totalNominal);
+            document.getElementById('statLeburCount').innerText = leburCount;
+            document.getElementById('statTakLeburCount').innerText = takLeburCount;
+        }
+
+        // Search & Filter Handler
+        function filterData() {
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+            const kategoriVal = document.getElementById('filterKategori').value;
+
+            const filtered = rawData.filter(item => {
+                const matchesSearch = (item.nomor || '').toLowerCase().includes(searchVal) || 
+                                      (item.keterangan || '').toLowerCase().includes(searchVal);
+                const matchesKategori = !kategoriVal || item.kategori === kategoriVal;
+                return matchesSearch && matchesKategori;
+            });
+
+            renderTable(filtered);
+        }
+
+        // Modal Open / Close Handlers
+        function openModal(mode, item = null) {
+            if (!apiUrl) {
+                showToast('Konfigurasi URL API terlebih dahulu', 'error');
+                openConfigModal();
+                return;
+            }
+
+            const modal = document.getElementById('formModal');
+            const modalBox = document.getElementById('formModalBox');
+            const form = document.getElementById('kwitansiForm');
+
+            form.reset();
+            document.getElementById('formTanggal').value = new Date().toISOString().split('T')[0];
+
+            if (mode === 'CREATE') {
+                document.getElementById('modalTitle').innerText = 'Tambah Kwitansi Baru';
+                document.getElementById('formId').value = '';
+            } else if (mode === 'UPDATE' && item) {
+                document.getElementById('modalTitle').innerText = 'Edit Data Kwitansi';
+                document.getElementById('formId').value = item.id || '';
+                document.getElementById('formNomor').value = item.nomor || '';
+                document.getElementById('formKategori').value = item.kategori || 'Lebur';
+                document.getElementById('formNominal').value = new Intl.NumberFormat('id-ID').format(unformatCurrency(item.nominal));
+                if (item.tanggal) {
+                    document.getElementById('formTanggal').value = item.tanggal.split('T')[0];
+                }
+                document.getElementById('formKeterangan').value = item.keterangan || '';
+            }
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalBox.classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('formModal');
+            const modalBox = document.getElementById('formModalBox');
+            modal.classList.add('opacity-0');
+            modalBox.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        // Form Submit Handler (CREATE & UPDATE)
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const btnSave = document.getElementById('btnSave');
+            btnSave.disabled = true;
+            btnSave.innerHTML = `<i class="ph ph-spinner animate-spin text-lg"></i> Menyimpan...`;
+
+            const id = document.getElementById('formId').value;
+            const action = id ? 'UPDATE' : 'CREATE';
+
+            const payload = {
+                action: action,
+                id: id,
+                nomor: document.getElementById('formNomor').value.trim(),
+                kategori: document.getElementById('formKategori').value,
+                nominal: unformatCurrency(document.getElementById('formNominal').value),
+                tanggal: document.getElementById('formTanggal').value,
+                keterangan: document.getElementById('formKeterangan').value.trim()
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showToast(result.message || 'Data berhasil disimpan!', 'success');
+                    closeModal();
+                    fetchData();
+                } else {
+                    showToast(result.message || 'Gagal menyimpan data', 'error');
+                }
+            } catch (err) {
+                console.error('Submit Error:', err);
+                showToast('Terjadi kesalahan saat mengirim data.', 'error');
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerHTML = `<span>Simpan Data</span>`;
+            }
+        }
+
+        // Delete Modal Handlers
+        function confirmDelete(id) {
+            deleteTargetId = id;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            deleteTargetId = null;
+            document.getElementById('deleteModal').classList.add('hidden');
+        }
+
+        async function executeDelete() {
+            if (!deleteTargetId) return;
+
+            const btn = document.getElementById('btnConfirmDelete');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin text-lg"></i>`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'DELETE', id: deleteTargetId })
+                });
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    showToast('Kwitansi berhasil dihapus!', 'success');
+                    closeDeleteModal();
+                    fetchData();
+                } else {
+                    showToast(result.message || 'Gagal menghapus kwitansi', 'error');
+                }
+            } catch (err) {
+                console.error('Delete Error:', err);
+                showToast('Terjadi kesalahan sistem saat menghapus.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Hapus';
+            }
+        }
+
+        // Print Modal Preview Handler
+        function openPrintModal(item) {
+            document.getElementById('printNomor').innerText = item.nomor || '-';
+            document.getElementById('printKategori').innerText = item.kategori || '-';
+            document.getElementById('printKeterangan').innerText = item.keterangan || '-';
+            document.getElementById('printNominal').innerText = formatRupiah(unformatCurrency(item.nominal));
+            
+            const formattedDate = item.tanggal ? new Date(item.tanggal).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
+            document.getElementById('printTanggal').innerText = formattedDate;
+
+            const printBadge = document.getElementById('printBadge');
+            const isLebur = (item.kategori || '').toLowerCase() === 'lebur';
+            printBadge.innerText = item.kategori || '-';
+            printBadge.className = `px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${isLebur ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`;
+
+            document.getElementById('printModal').classList.remove('hidden');
+        }
+
+        function closePrintModal() {
+            document.getElementById('printModal').classList.add('hidden');
+        }
+
+        // Toast Notification System
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            const isSuccess = type === 'success';
+            const bgClass = isSuccess ? 'bg-slate-900 text-white' : 'bg-rose-600 text-white';
+            const icon = isSuccess ? 'ph-check-circle' : 'ph-x-circle';
+
+            toast.className = `pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg ${bgClass} text-xs font-medium transform transition duration-300 translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="ph ${icon} text-lg"></i> <span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+    </script>
+</body>
+</html>
